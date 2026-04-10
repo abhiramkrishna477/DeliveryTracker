@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aigfox Originals - Client Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Supabase JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- HTML2Canvas for Image Downloads -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #f8fafc;
+            color: #1a202c;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .app-container {
+            max-width: 414px;
+            height: 100vh;
+            max-height: 896px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+
+        @media (min-width: 450px) {
+            .app-container {
+                height: 90vh;
+                margin-top: 5vh;
+                border-radius: 40px;
+                border: 8px solid #f1f5f9;
+            }
+        }
+
+        .scroll-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            padding-bottom: 40px;
+        }
+        
+        .scroll-area::-webkit-scrollbar { display: none; }
+        .scroll-area { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .card-shadow { box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01); }
+        .gradient-card { background: linear-gradient(135deg, #1f2937 0%, #000000 100%); color: white; }
+        
+        .timeline-item { position: relative; z-index: 1; }
+
+        .modal-backdrop { backdrop-filter: blur(4px); }
+        
+        .fab {
+            position: absolute; bottom: 30px; right: 24px; width: 56px; height: 56px;
+            background-color: #000000; color: white; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3); cursor: pointer; z-index: 40;
+            transition: transform 0.2s; font-size: 24px;
+        }
+        .fab:hover { transform: scale(1.05); }
+
+        #toast {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            padding: 12px 24px; border-radius: 12px; background: #000; color: white;
+            font-size: 14px; z-index: 100; transition: opacity 0.3s; pointer-events: none;
+            opacity: 0;
+            font-weight: 600;
+        }
+
+        /* Upgraded Deliverable Animations */
+        @keyframes slideInUp {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .deliverable-item {
+            animation: slideInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+        .deliverable-item:nth-child(1) { animation-delay: 0.1s; }
+        .deliverable-item:nth-child(2) { animation-delay: 0.2s; }
+        .deliverable-item:nth-child(3) { animation-delay: 0.3s; }
+        .deliverable-item:nth-child(4) { animation-delay: 0.4s; }
+        .deliverable-item:nth-child(5) { animation-delay: 0.5s; }
+        
+        .deliverable-item:hover {
+            transform: translateY(-4px) scale(1.01);
+            box-shadow: 0 12px 24px -8px rgba(249, 115, 22, 0.15);
+            border-color: #ffedd5;
+        }
+
+        /* Enhanced Timeline Animations */
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.6); transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { box-shadow: 0 0 0 12px rgba(249, 115, 22, 0); transform: scale(1); }
+        }
+        .active-dot { animation: pulse-ring 2s infinite; }
+
+        @keyframes progress-beam {
+            0% { background-position: 0 0; }
+            100% { background-position: 0 28px; }
+        }
+        .timeline-line-active {
+            background: repeating-linear-gradient(
+                -45deg,
+                #f97316,
+                #f97316 10px,
+                #fdba74 10px,
+                #fdba74 20px
+            );
+            background-size: 100% 28px;
+            animation: progress-beam 0.8s linear infinite;
+            box-shadow: 0 0 10px rgba(249, 115, 22, 0.6);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="toast">Message</div>
+
+    <div class="app-container" id="app-root">
+        <div class="flex flex-col items-center justify-center h-full text-center p-8">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-black mb-4"></div>
+            <p class="text-gray-500 text-sm">Initializing Secure Connection...</p>
+        </div>
+    </div>
+
+    <!-- Generic Single Input Modal -->
+    <div id="custom-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-40 p-4 modal-backdrop">
+        <div class="bg-white rounded-3xl w-full max-w-sm p-6 card-shadow transform transition-all scale-95 opacity-0" id="modal-content">
+            <h3 class="text-lg font-bold text-gray-800 mb-2" id="modal-title">Edit Value</h3>
+            <textarea id="modal-input-area" class="w-full border-2 border-gray-100 rounded-xl px-4 py-3 mb-4 focus:outline-none focus:border-black transition-colors hidden" rows="4"></textarea>
+            <input type="text" id="modal-input" class="w-full border-2 border-gray-100 rounded-xl px-4 py-3 mb-4 focus:outline-none focus:border-black transition-colors" />
+            <div class="flex gap-3">
+                <button onclick="closeModal()" class="flex-1 bg-gray-100 text-gray-600 font-semibold py-3 rounded-xl hover:bg-gray-200 transition-colors">Cancel</button>
+                <button onclick="saveModal()" class="flex-1 bg-black text-white font-semibold py-3 rounded-xl hover:bg-gray-800 transition-colors">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Deliverable Link Modal -->
+    <div id="deliverable-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-40 p-4 modal-backdrop">
+        <div class="bg-white rounded-3xl w-full max-w-sm p-6 card-shadow transform transition-all scale-95 opacity-0" id="deliverable-modal-content">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">Add New Deliverable</h3>
+            <div class="space-y-3 mb-4">
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase ml-1">File Name</label>
+                    <input type="text" id="deliv-name" placeholder="e.g. Final Video V2" class="w-full border-2 border-gray-100 rounded-xl px-4 py-3 focus:outline-none focus:border-black transition-colors" />
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase ml-1">Google Drive / Frame.io Link</label>
+                    <input type="url" id="deliv-url" placeholder="https://..." class="w-full border-2 border-gray-100 rounded-xl px-4 py-3 focus:outline-none focus:border-black transition-colors" />
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="closeDeliverableModal()" class="flex-1 bg-gray-100 text-gray-600 font-semibold py-3 rounded-xl hover:bg-gray-200 transition-colors">Cancel</button>
+                <button onclick="saveDeliverable()" class="flex-1 bg-black text-white font-semibold py-3 rounded-xl hover:bg-gray-800 transition-colors">Add Link</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Create Project Modal -->
+    <div id="create-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-40 p-4 modal-backdrop">
+        <div class="bg-white rounded-3xl w-full max-w-sm p-6 card-shadow transform transition-all scale-95 opacity-0" id="create-modal-content">
+            <h3 class="text-xl font-extrabold text-gray-800 mb-4">Create New Project</h3>
+            <div class="space-y-3 mb-6">
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase ml-1">Client Username</label>
+                    <input type="text" id="create-client" placeholder="e.g. miller" class="w-full border-2 border-gray-100 rounded-xl px-4 py-3 focus:outline-none focus:border-black transition-colors" />
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase ml-1">Campaign Name</label>
+                    <input type="text" id="create-campaign" placeholder="e.g. Summer Promo 2026" class="w-full border-2 border-gray-100 rounded-xl px-4 py-3 focus:outline-none focus:border-black transition-colors" />
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase ml-1">Video Title</label>
+                    <input type="text" id="create-video" placeholder="e.g. Main Commercial" class="w-full border-2 border-gray-100 rounded-xl px-4 py-3 focus:outline-none focus:border-black transition-colors" />
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="closeCreateModal()" class="flex-1 bg-gray-100 text-gray-600 font-semibold py-3 rounded-xl hover:bg-gray-200 transition-colors">Cancel</button>
+                <button onclick="saveNewProject()" class="flex-1 bg-black text-white font-semibold py-3 rounded-xl hover:bg-gray-800 transition-colors">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // CONFIGURATION
+        // ==========================================
+        const SUPABASE_URL = "https://jtpsnufycomhozsiegjh.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp0cHNudWZ5Y29taG96c2llZ2poIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE5OTI5NjAsImV4cCI6MjA3NzU2ODk2MH0.SsKcUAjkv4gsTKawOfN-KKzYRkUKoQZj-JZDo8liggc";
+        
+        const supabaseClientInstance = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // --- STATE MANAGEMENT ---
+        let state = {
+            role: null, 
+            screen: 'login', 
+            activeClientUsername: null,
+            activeCampaignName: null,
+            activeProjectId: null, 
+            projects: [] 
+        };
+
+        let modalCallback = null;
+        let isTextArea = false;
+
+        // --- DATABASE LOGIC ---
+        let realtimeChannel = null;
+
+        window.forceRefresh = async () => {
+            showToast("Refreshing...");
+            await fetchProjects();
+            showToast("Up to date! ✨");
+        };
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.style.opacity = '1';
+            setTimeout(() => t.style.opacity = '0', 2500);
+        }
+        
+        async function fetchProjects() {
+            try {
+                if (!supabaseClientInstance) {
+                    console.error("Supabase client not initialized");
+                    return;
+                }
+
+                const { data, error } = await supabaseClientInstance
+                    .from('projects')
+                    .select('*')
+                    .order('updatedAt', { ascending: false });
+
+                if (error) {
+                    console.error("Supabase Query Error:", error);
+                    showToast("DB Error: " + error.message); 
+                    return; 
+                }
+                
+                state.projects = data || []; 
+                if (state.screen !== 'login' && state.screen !== 'client_login' && state.screen !== 'admin_login') {
+                    render();
+                }
+            } catch (err) {
+                console.error('Javascript Error:', err.message);
+                showToast("Connection Error: " + err.message);
+            }
+        }
+
+        fetchProjects();
+
+        function setupDatabaseListener() {
+            if (realtimeChannel) return; 
+            fetchProjects();
+            realtimeChannel = supabaseClientInstance.channel('public:projects')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, payload => {
+                    fetchProjects(); 
+                })
+                .subscribe();
+        }
+
+        async function updateProjectData(updates) {
+            if (state.role !== 'admin' || !state.activeProjectId) return;
+            try {
+                updates.updatedAt = Date.now();
+                const { error } = await supabaseClientInstance
+                    .from('projects')
+                    .update(updates)
+                    .eq('id', state.activeProjectId);
+
+                if (error) throw error;
+                showToast("Saved to cloud");
+            } catch (e) { 
+                console.error("Update failed", e);
+                showToast("Update Failed");
+            }
+        }
+
+        // --- HELPERS ---
+        function getSyncStatus(project) {
+            if (!project.timeline || project.timeline.length === 0) return "Just Started";
+            const activeItem = project.timeline.find(t => t.state === 'active');
+            if (activeItem) return activeItem.title;
+            const allDone = project.timeline.every(t => t.state === 'done');
+            if (allDone) return "Completed";
+            return "Pending";
+        }
+        
+        function getPresetMessage(stageTitle) {
+            const presets = {
+                "Scripting & Pre-prod": "We are currently working on the script and gathering requirements. Exciting things ahead! ✍️",
+                "Video Shoot": "Lights, camera, action! 🎥 The video shoot is in progress. We'll share updates soon.",
+                "Rough Cut Edit": "The raw footage is being pieced together. ✂️ A rough cut will be ready for your review shortly.",
+                "Color Grading": "Adding the final visual polish and color grading to make the video pop! 🎨",
+                "Delivery": "The final video is almost ready! We are preparing the files for handover. 🚀"
+            };
+            return presets[stageTitle] || "Progress is looking great! We are working hard on the current phase. ✨";
+        }
+
+        // --- NAVIGATION HANDLERS ---
+        window.startClientLogin = () => { state.screen = 'client_login'; render(); };
+        window.startAdminLogin = () => { state.screen = 'admin_login'; render(); };
+        
+        window.submitClientLogin = async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('login-username').value.trim().toLowerCase();
+            const password = document.getElementById('login-password').value;
+            
+            if (password !== '123') { showToast("Incorrect password."); return; }
+            if (!username) return;
+
+            const { data, error } = await supabaseClientInstance
+                .from('projects')
+                .select('clientUsername')
+                .eq('clientUsername', username)
+                .limit(1);
+
+            if (error || !data || data.length === 0) {
+                showToast("Client username not found! Please check your spelling.");
+                return;
+            }
+
+            state.role = 'client';
+            state.activeClientUsername = username;
+            state.screen = 'campaigns_hub';
+            setupDatabaseListener();
+            render();
+        };
+
+        window.submitAdminLogin = (e) => {
+            e.preventDefault();
+            const username = document.getElementById('admin-username').value.trim().toLowerCase();
+            const password = document.getElementById('admin-password').value;
+            
+            if (username === 'admin' && password === '123') {
+                state.role = 'admin';
+                state.screen = 'clients_hub';
+                setupDatabaseListener();
+                render();
+            } else {
+                showToast("Incorrect Admin Credentials."); 
+            }
+        };
+
+        window.logout = () => {
+            state.role = null;
+            state.screen = 'login';
+            state.activeClientUsername = null;
+            state.activeCampaignName = null;
+            state.activeProjectId = null;
+            if (realtimeChannel) {
+                supabaseClientInstance.removeChannel(realtimeChannel);
+                realtimeChannel = null;
+            }
+            render();
+        };
+
+        window.openClient = (username) => { state.activeClientUsername = username; state.screen = 'campaigns_hub'; render(); };
+        window.openCampaign = (campaignName) => { state.activeCampaignName = campaignName; state.screen = 'videos_hub'; render(); };
+        window.openProject = (id) => { state.activeProjectId = parseInt(id); state.screen = 'dashboard'; render(); };
+
+        window.goBack = () => {
+            if (state.screen === 'client_login' || state.screen === 'admin_login') state.screen = 'login';
+            else if (state.screen === 'dashboard') state.screen = 'videos_hub';
+            else if (state.screen === 'videos_hub') state.screen = 'campaigns_hub';
+            else if (state.screen === 'campaigns_hub') {
+                if (state.role === 'admin') state.screen = 'clients_hub';
+                else logout(); 
+            }
+            render();
+        };
+
+        // --- ADMIN PROJECT CREATION ---
+        window.openCreateModal = () => {
+            const modal = document.getElementById('create-modal');
+            const content = document.getElementById('create-modal-content');
+            document.getElementById('create-client').value = state.activeClientUsername || '';
+            document.getElementById('create-campaign').value = state.activeCampaignName || '';
+            document.getElementById('create-video').value = '';
+            modal.classList.remove('hidden'); modal.classList.add('flex');
+            setTimeout(() => {
+                content.classList.remove('scale-95', 'opacity-0');
+                content.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        };
+
+        window.closeCreateModal = () => {
+            const modal = document.getElementById('create-modal');
+            const content = document.getElementById('create-modal-content');
+            content.classList.remove('scale-100', 'opacity-100'); content.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => { modal.classList.remove('flex'); modal.classList.add('hidden'); }, 200);
+        };
+
+        window.saveNewProject = async () => {
+            const client = document.getElementById('create-client').value.trim();
+            const campaign = document.getElementById('create-campaign').value.trim();
+            const video = document.getElementById('create-video').value.trim();
+
+            if (!client || !campaign || !video) { alert("Please fill all fields"); return; }
+
+            const newProject = {
+                clientUsername: client.toLowerCase(),
+                campaignName: campaign,
+                title: video,
+                name: video,  
+                statusTitle: "Scripting & Pre-prod",
+                progress: 0,
+                customMessage: "Project initialized. Let's make some magic!",
+                deliverables: [],
+                timeline: [
+                    { title: "Scripting & Pre-prod", state: "active", timeStr: "Expected: TBD", rawDate: "" },
+                    { title: "Video Shoot", state: "pending", timeStr: "Expected: TBD", rawDate: "" },
+                    { title: "Rough Cut Edit", state: "pending", timeStr: "Expected: TBD", rawDate: "" },
+                    { title: "Color Grading", state: "pending", timeStr: "Expected: TBD", rawDate: "" },
+                    { title: "Delivery", state: "pending", timeStr: "Expected: TBD", rawDate: "" }
+                ],
+                updatedAt: Date.now()
+            };
+
+            try {
+                const { error } = await supabaseClientInstance.from('projects').insert([newProject]);
+                if (error) throw error;
+                showToast("Project Created");
+                closeCreateModal();
+            } catch (e) { 
+                console.error("Error creating project", e);
+                showToast("Error creating project");
+            }
+        };
+
+        // --- DELIVERABLES ---
+        window.openDeliverableModal = () => {
+            if (state.role !== 'admin') return;
+            const modal = document.getElementById('deliverable-modal');
+            const content = document.getElementById('deliverable-modal-content');
+            document.getElementById('deliv-name').value = '';
+            document.getElementById('deliv-url').value = '';
+            modal.classList.remove('hidden'); modal.classList.add('flex');
+            setTimeout(() => {
+                content.classList.remove('scale-95', 'opacity-0');
+                content.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        };
+
+        window.closeDeliverableModal = () => {
+            const modal = document.getElementById('deliverable-modal');
+            const content = document.getElementById('deliverable-modal-content');
+            content.classList.remove('scale-100', 'opacity-100'); content.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => { modal.classList.remove('flex'); modal.classList.add('hidden'); }, 200);
+        };
+
+        window.saveDeliverable = async () => {
+            const name = document.getElementById('deliv-name').value.trim();
+            const url = document.getElementById('deliv-url').value.trim();
+
+            if (!name || !url) { alert("Please enter both name and link."); return; }
+
+            const project = state.projects.find(p => p.id === state.activeProjectId);
+            const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+            const newDeliverable = {
+                name: name,
+                url: url,
+                time: today,
+                icon: "fa-link"
+            };
+
+            const updatedDeliverables = [newDeliverable, ...(project.deliverables || [])];
+            updateProjectData({ deliverables: updatedDeliverables });
+            closeDeliverableModal();
+        };
+
+        // --- ADMIN EDITING / RENAME / DELETE ---
+        window.openModal = (title, currentValue, type, callback) => {
+            if (state.role !== 'admin') return;
+            const modal = document.getElementById('custom-modal');
+            const content = document.getElementById('modal-content');
+            const input = document.getElementById('modal-input');
+            const textarea = document.getElementById('modal-input-area');
+            const titleEl = document.getElementById('modal-title');
+            
+            titleEl.innerText = title;
+            isTextArea = (type === 'textarea');
+
+            if (isTextArea) {
+                input.classList.add('hidden');
+                textarea.classList.remove('hidden');
+                textarea.value = currentValue;
+            } else {
+                textarea.classList.add('hidden');
+                input.classList.remove('hidden');
+                input.type = type;
+                input.value = currentValue;
+            }
+
+            modalCallback = callback;
+            modal.classList.remove('hidden'); modal.classList.add('flex');
+            setTimeout(() => {
+                content.classList.remove('scale-95', 'opacity-0');
+                content.classList.add('scale-100', 'opacity-100');
+                if(isTextArea) textarea.focus(); else input.focus();
+            }, 10);
+        };
+
+        window.closeModal = () => {
+            const modal = document.getElementById('custom-modal');
+            const content = document.getElementById('modal-content');
+            content.classList.remove('scale-100', 'opacity-100'); content.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => { modal.classList.remove('flex'); modal.classList.add('hidden'); modalCallback = null; }, 200);
+        };
+
+        window.saveModal = () => {
+            const inputEl = isTextArea ? document.getElementById('modal-input-area') : document.getElementById('modal-input');
+            let val = inputEl.value;
+            if (!isTextArea && document.getElementById('modal-input').type === 'number') val = parseInt(val) || 0;
+            if (modalCallback) modalCallback(val);
+            closeModal();
+        };
+
+        window.editCustomMessage = (current) => openModal('Message to Client', current, 'textarea', (val) => updateProjectData({ customMessage: val }));
+        
+        window.editProgress = (currentVal) => {
+            if (state.role !== 'admin') return;
+            openModal('Edit Progress % (0-100)', currentVal, 'number', (val) => {
+                let num = parseInt(val);
+                if (isNaN(num)) num = 0;
+                if (num > 100) num = 100;
+                if (num < 0) num = 0;
+                updateProjectData({ progress: num });
+            });
+        };
+
+        // Rename & Delete Actions
+        window.renameClient = async (e, oldName) => {
+            e.stopPropagation();
+            openModal('Rename Client Username', oldName, 'text', async (newName) => {
+                if(!newName || newName === oldName) return;
+                try {
+                    await supabaseClientInstance.from('projects').update({ clientUsername: newName.toLowerCase() }).eq('clientUsername', oldName);
+                    showToast('Client renamed');
+                } catch(err) { showToast('Error renaming'); }
+            });
+        };
+
+        window.deleteClient = async (e, oldName) => {
+            e.stopPropagation();
+            if(confirm(`Are you sure you want to delete ALL projects for ${oldName}? This cannot be undone.`)) {
+                try {
+                    await supabaseClientInstance.from('projects').delete().eq('clientUsername', oldName);
+                    showToast('Client deleted');
+                } catch(err) { showToast('Error deleting'); }
+            }
+        };
+
+        window.renameCampaign = async (e, oldName) => {
+            e.stopPropagation();
+            openModal('Rename Campaign', oldName, 'text', async (newName) => {
+                if(!newName || newName === oldName) return;
+                try {
+                    await supabaseClientInstance.from('projects')
+                        .update({ campaignName: newName })
+                        .eq('clientUsername', state.activeClientUsername)
+                        .eq('campaignName', oldName);
+                    showToast('Campaign renamed');
+                } catch(err) { showToast('Error renaming'); }
+            });
+        };
+
+        window.deleteCampaign = async (e, oldName) => {
+            e.stopPropagation();
+            if(confirm(`Are you sure you want to delete campaign ${oldName} and all its videos?`)) {
+                try {
+                    await supabaseClientInstance.from('projects')
+                        .delete()
+                        .eq('clientUsername', state.activeClientUsername)
+                        .eq('campaignName', oldName);
+                    showToast('Campaign deleted');
+                } catch(err) { showToast('Error deleting'); }
+            }
+        };
+
+        window.renameVideo = async (e, id, oldName) => {
+            e.stopPropagation();
+            openModal('Rename Video Title', oldName, 'text', async (newName) => {
+                if(!newName || newName === oldName) return;
+                try {
+                    await supabaseClientInstance.from('projects').update({ title: newName }).eq('id', id);
+                    showToast('Video renamed');
+                } catch(err) { showToast('Error renaming'); }
+            });
+        };
+
+        window.deleteVideo = async (e, id) => {
+            e.stopPropagation();
+            if(confirm(`Are you sure you want to delete this video project?`)) {
+                try {
+                    await supabaseClientInstance.from('projects').delete().eq('id', id);
+                    showToast('Video deleted');
+                } catch(err) { showToast('Error deleting'); }
+            }
+        };
+
+        // Deliverables Rename & Delete Actions
+        window.renameDeliverable = async (e, index, oldName) => {
+            e.preventDefault(); 
+            e.stopPropagation();
+            openModal('Rename Link', oldName, 'text', (newName) => {
+                if (!newName || newName === oldName) return;
+                const project = state.projects.find(p => p.id === state.activeProjectId);
+                let newDeliverables = [...(project.deliverables || [])];
+                newDeliverables[index].name = newName;
+                updateProjectData({ deliverables: newDeliverables });
+            });
+        };
+
+        window.deleteDeliverable = async (e, index) => {
+            e.preventDefault(); 
+            e.stopPropagation();
+            if(confirm('Are you sure you want to delete this link?')) {
+                const project = state.projects.find(p => p.id === state.activeProjectId);
+                let newDeliverables = [...(project.deliverables || [])];
+                newDeliverables.splice(index, 1);
+                updateProjectData({ deliverables: newDeliverables });
+            }
+        };
+
+        // Smart Date Picker with auto-calculate
+        window.editTimelineDate = (index, currentRawVal) => {
+            openModal('Set Timeline Date', currentRawVal || '', 'date', (newVal) => {
+                if (!newVal) return; 
+                
+                const project = state.projects.find(p => p.id === state.activeProjectId);
+                let newTimeline = [...project.timeline];
+                
+                // Parse exact local date from 'YYYY-MM-DD'
+                let [y, m, d_day] = newVal.split('-');
+                let d = new Date(y, m - 1, d_day);
+                
+                // Apply date to current and all following items (+1 day gap)
+                for (let i = index; i < newTimeline.length; i++) {
+                    const yyyy = d.getFullYear();
+                    const mm = String(d.getMonth() + 1).padStart(2, '0');
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    const raw = `${yyyy}-${mm}-${dd}`;
+                    
+                    const display = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    
+                    // If the stage is already done, keep it as "Completed"
+                    const prefix = newTimeline[i].state === 'done' ? 'Completed:' : 'Expected:';
+                    
+                    newTimeline[i].rawDate = raw;
+                    newTimeline[i].timeStr = `${prefix} ${display}`;
+                    
+                    // Add 1 day for next stage
+                    d.setDate(d.getDate() + 1);
+                }
+                
+                updateProjectData({ timeline: newTimeline });
+            });
+        };
+
+        window.editTimelineState = (index, currentState) => {
+            if(state.role !== 'admin') return;
+            const nextState = currentState === 'pending' ? 'active' : (currentState === 'active' ? 'done' : 'pending');
+            const project = state.projects.find(p => p.id === state.activeProjectId);
+            let newTimeline = [...project.timeline];
+            newTimeline[index].state = nextState;
+            
+            // Adjust Expected vs Completed text if a date exists
+            if (newTimeline[index].timeStr) {
+                if (nextState === 'done') {
+                    newTimeline[index].timeStr = newTimeline[index].timeStr.replace('Expected:', 'Completed:');
+                } else if (nextState === 'active' || nextState === 'pending') {
+                    newTimeline[index].timeStr = newTimeline[index].timeStr.replace('Completed:', 'Expected:');
+                }
+            }
+
+            // Auto-advance the next stage if we just completed this one
+            if (nextState === 'done' && index + 1 < newTimeline.length) {
+                if (newTimeline[index + 1].state === 'pending') {
+                    newTimeline[index + 1].state = 'active';
+                }
+            }
+
+            const totalTasks = newTimeline.length;
+            const completedTasks = newTimeline.filter(t => t.state === 'done').length;
+            const newProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+            // Update Preset message intelligently
+            let activeItem = newTimeline.find(t => t.state === 'active') || newTimeline.find(t => t.state === 'done');
+            let newMessage = project.customMessage;
+            if (activeItem && (nextState === 'active' || nextState === 'done')) {
+                 newMessage = getPresetMessage(activeItem.title);
+            }
+
+            updateProjectData({ timeline: newTimeline, progress: newProgress, customMessage: newMessage });
+        };
+        
+        // --- PREMIUM ADMIN IMAGE GENERATION ---
+        window.downloadDeliveryMap = async () => {
+            const project = state.projects.find(p => p.id === state.activeProjectId);
+            const containerToClone = document.getElementById('delivery-map-container');
+            if (!containerToClone) return;
+            
+            showToast("Generating Premium Export... 📸");
+
+            // Beautiful scalable circle math for the export
+            const dashOffset = 251.2 - (project.progress / 100) * 251.2;
+
+            try {
+                const exportWrapper = document.createElement('div');
+                exportWrapper.style.position = 'absolute';
+                exportWrapper.style.left = '-9999px';
+                exportWrapper.style.width = '800px'; 
+                exportWrapper.style.backgroundColor = '#f8fafc';
+                exportWrapper.style.padding = '40px';
+                exportWrapper.style.fontFamily = "'Plus Jakarta Sans', sans-serif";
+                
+                const card = document.createElement('div');
+                card.style.backgroundColor = '#ffffff';
+                card.style.borderRadius = '24px';
+                card.style.boxShadow = '0 25px 50px -12px rgba(0, 0, 0, 0.1)';
+                card.style.overflow = 'hidden';
+                
+                const header = document.createElement('div');
+                header.style.background = 'linear-gradient(135deg, #1a202c 0%, #000000 100%)';
+                header.style.padding = '40px';
+                header.style.display = 'flex';
+                header.style.justifyContent = 'space-between';
+                header.style.alignItems = 'center';
+                
+                header.innerHTML = `
+                    <div style="flex: 1;">
+                        <p style="color: #f97316; font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin: 0 0 8px 0;">Client: ${project.clientUsername}</p>
+                        <h2 style="font-size: 32px; font-weight: 800; color: #ffffff; margin: 0 0 8px 0; line-height: 1.2;">${project.campaignName}</h2>
+                        <p style="font-size: 18px; color: #94a3b8; font-weight: 600; margin: 0;">🎥 ${project.title}</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 20px;">
+                        <div style="text-align: right;">
+                            <p style="color: #ffffff; font-size: 18px; font-weight: 800; margin: 0; line-height: 1.2;">Project</p>
+                            <p style="color: #ffffff; font-size: 18px; font-weight: 800; margin: 0; line-height: 1.2;">Progress</p>
+                        </div>
+                        <div style="position: relative; width: 90px; height: 90px;">
+                            <svg viewBox="0 0 100 100" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: rotate(-90deg);">
+                                <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="8"></circle>
+                                <circle cx="50" cy="50" r="40" fill="none" stroke="#f97316" stroke-width="8" stroke-linecap="round" stroke-dasharray="251.2" stroke-dashoffset="${dashOffset}"></circle>
+                            </svg>
+                            <!-- Using exact pixel math instead of Flexbox for flawless html2canvas centering -->
+                            <div style="position: absolute; top: 33px; left: 0; width: 100%; z-index: 10; text-align: center;">
+                                <span style="font-size: 24px; font-weight: 800; color: #ffffff; margin: 0; padding: 0; line-height: 1; display: block;">${project.progress}%</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                const body = document.createElement('div');
+                body.style.padding = '40px';
+                
+                const clonedTimeline = containerToClone.cloneNode(true);
+                
+                const animatedElements = clonedTimeline.querySelectorAll('.timeline-line-active');
+                animatedElements.forEach(el => {
+                    el.style.animation = 'none';
+                    el.style.background = '#f97316'; 
+                });
+
+                const h3 = clonedTimeline.querySelector('h3');
+                if (h3) h3.remove();
+                
+                // Remove Edit icons and the checkmarks inside the circles for the clean image
+                const editIcons = clonedTimeline.querySelectorAll('.fa-pen');
+                editIcons.forEach(icon => icon.remove());
+                const checkIcons = clonedTimeline.querySelectorAll('.fa-check');
+                checkIcons.forEach(icon => icon.remove());
+
+                clonedTimeline.style.padding = '0';
+                clonedTimeline.style.boxShadow = 'none';
+
+                body.appendChild(clonedTimeline);
+                
+                const footer = document.createElement('div');
+                footer.style.padding = '24px 40px';
+                footer.style.borderTop = '2px solid #f1f5f9';
+                footer.style.backgroundColor = '#fafafa';
+                footer.style.color = '#94a3b8';
+                footer.style.fontSize = '13px';
+                footer.style.fontWeight = '700';
+                footer.style.textAlign = 'center';
+                footer.innerText = `Generated on ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}  •  Aigfox Client Portal`;
+
+                card.appendChild(header);
+                card.appendChild(body);
+                card.appendChild(footer);
+                exportWrapper.appendChild(card);
+                document.body.appendChild(exportWrapper);
+
+                await new Promise(resolve => setTimeout(resolve, 150));
+
+                const canvas = await html2canvas(exportWrapper, {
+                    backgroundColor: null,
+                    scale: 2, 
+                    logging: false
+                });
+
+                document.body.removeChild(exportWrapper);
+
+                const link = document.createElement('a');
+                link.download = `${project.clientUsername}_${project.campaignName}_Status.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                
+                setTimeout(() => showToast("Download Complete! ✨"), 500);
+            } catch (err) {
+                console.error(err);
+                showToast("Error saving image 😢");
+            }
+        };
+
+        // --- RENDERING ---
+        function render() {
+            const root = document.getElementById('app-root');
+            if (state.screen === 'login') root.innerHTML = renderGateway();
+            else if (state.screen === 'client_login') root.innerHTML = renderClientLoginForm();
+            else if (state.screen === 'admin_login') root.innerHTML = renderAdminLoginForm();
+            else if (state.screen === 'clients_hub') root.innerHTML = renderClientsHub();
+            else if (state.screen === 'campaigns_hub') root.innerHTML = renderCampaignsHub();
+            else if (state.screen === 'videos_hub') root.innerHTML = renderVideosHub();
+            else if (state.screen === 'dashboard') root.innerHTML = renderDashboardScreen();
+        }
+
+        function renderGateway() {
+            return `
+                <div class="flex flex-col items-center justify-center h-full p-8 text-center bg-white">
+                    <img src="aigfox logo.png" alt="Aigfox Logo" class="w-24 h-24 rounded-3xl shadow-lg mb-6 card-shadow shrink-0 object-cover" onerror="this.src='https://placehold.co/100x100/000/fff?text=Aigfox'; this.onerror=null;" />
+                    <h1 class="text-3xl font-bold text-gray-800 mb-2">Aigfox</h1>
+                    <p class="text-gray-500 mb-10">Client Operations Portal</p>
+                    <div class="w-full space-y-4 shrink-0">
+                        <button onclick="startClientLogin()" class="w-full bg-black text-white font-semibold py-4 rounded-2xl shadow-md hover:bg-gray-800 transition-all flex items-center justify-center gap-3">
+                            <i class="fa-regular fa-user text-orange-500"></i> Login as Client
+                        </button>
+                        <button onclick="startAdminLogin()" class="w-full bg-white border-2 border-gray-100 text-gray-800 font-semibold py-4 rounded-2xl shadow-sm hover:border-black transition-all flex items-center justify-center gap-3 card-shadow">
+                            <i class="fa-solid fa-lock text-gray-500"></i> Login as Admin
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderClientLoginForm() {
+            return `
+                <div class="flex flex-col h-full bg-white relative">
+                    <div class="px-6 pt-8 pb-4 flex justify-between items-center bg-white shrink-0">
+                        <button onclick="goBack()" class="text-gray-600 w-10 h-10 flex items-center justify-center rounded-full shadow-sm border border-gray-100 hover:bg-gray-50">
+                            <i class="fa-solid fa-arrow-left"></i>
+                        </button>
+                    </div>
+                    <div class="p-8 flex-1 flex flex-col justify-center pb-32">
+                        <h2 class="text-3xl font-bold text-gray-800 mb-2">Client Access 👋</h2>
+                        <p class="text-gray-500 mb-8">Please enter your details to view your campaigns.</p>
+                        <form onsubmit="submitClientLogin(event)" class="space-y-4">
+                            <div>
+                                <label class="text-xs font-bold text-gray-500 uppercase ml-1">Username</label>
+                                <input type="text" id="login-username" required placeholder="e.g. miller" class="w-full border-2 border-gray-100 rounded-xl px-4 py-4 mt-1 focus:outline-none focus:border-black transition-colors bg-gray-50 focus:bg-white" />
+                            </div>
+                            <div>
+                                <label class="text-xs font-bold text-gray-500 uppercase ml-1">Password</label>
+                                <input type="password" id="login-password" required placeholder="***" class="w-full border-2 border-gray-100 rounded-xl px-4 py-4 mt-1 focus:outline-none focus:border-black transition-colors bg-gray-50 focus:bg-white" />
+                            </div>
+                            <button type="submit" class="w-full bg-black text-white font-bold py-4 rounded-xl shadow-md hover:bg-gray-800 transition-all mt-6">
+                                Access Portal
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderAdminLoginForm() {
+            return `
+                <div class="flex flex-col h-full bg-white relative">
+                    <div class="px-6 pt-8 pb-4 flex justify-between items-center bg-white shrink-0">
+                        <button onclick="goBack()" class="text-gray-600 w-10 h-10 flex items-center justify-center rounded-full shadow-sm border border-gray-100 hover:bg-gray-50">
+                            <i class="fa-solid fa-arrow-left"></i>
+                        </button>
+                    </div>
+                    <div class="p-8 flex-1 flex flex-col justify-center pb-32">
+                        <h2 class="text-3xl font-bold text-gray-800 mb-2">Admin Login 🛠️</h2>
+                        <p class="text-gray-500 mb-8">Secure access for project managers.</p>
+                        <form onsubmit="submitAdminLogin(event)" class="space-y-4">
+                            <div>
+                                <label class="text-xs font-bold text-gray-500 uppercase ml-1">Admin Username</label>
+                                <input type="text" id="admin-username" required placeholder="admin" class="w-full border-2 border-gray-100 rounded-xl px-4 py-4 mt-1 focus:outline-none focus:border-black transition-colors bg-gray-50 focus:bg-white" />
+                            </div>
+                            <div>
+                                <label class="text-xs font-bold text-gray-500 uppercase ml-1">Password</label>
+                                <input type="password" id="admin-password" required placeholder="***" class="w-full border-2 border-gray-100 rounded-xl px-4 py-4 mt-1 focus:outline-none focus:border-black transition-colors bg-gray-50 focus:bg-white" />
+                            </div>
+                            <button type="submit" class="w-full bg-black text-white font-bold py-4 rounded-xl shadow-md hover:bg-gray-800 transition-all mt-6">
+                                Login to Workspace
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderHeader(title, subtitle, backEnabled = true) {
+            const backBtn = backEnabled ? `
+                <button onclick="goBack()" class="w-10 h-10 rounded-full bg-white text-gray-500 shadow-sm flex items-center justify-center mr-4 hover:bg-gray-50 shrink-0">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </button>` : '';
+            return `
+                <div class="flex items-center mb-6 pt-4 px-6 shrink-0">
+                    ${backBtn}
+                    <div class="flex-1">
+                        <h2 class="text-2xl font-bold text-gray-800">${title}</h2>
+                        <p class="text-orange-500 font-semibold text-xs uppercase tracking-wider mt-1">${subtitle}</p>
+                    </div>
+                    <img src="aigfox logo.png" alt="Aigfox" class="w-10 h-10 rounded-full object-cover shadow-sm mr-2" onerror="this.style.display='none'" />
+                    <button onclick="forceRefresh()" class="w-10 h-10 rounded-full bg-white text-gray-400 flex items-center justify-center ml-2 transition hover:bg-gray-100 shadow-sm shrink-0" title="Refresh">
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                    </button>
+                    <button onclick="logout()" class="w-10 h-10 rounded-full bg-white text-gray-400 flex items-center justify-center ml-2 transition hover:bg-gray-100 shadow-sm shrink-0" title="Logout">
+                        <i class="fa-solid fa-power-off"></i>
+                    </button>
+                </div>
+            `;
+        }
+
+        function renderClientsHub() {
+            const clients = [...new Set(state.projects.map(p => p.clientUsername))].filter(Boolean);
+            let listHtml = clients.map(c => `
+                <div onclick="openClient('${c}')" class="bg-white rounded-2xl p-5 mb-4 card-shadow shrink-0 cursor-pointer transform transition hover:-translate-y-1 flex items-center gap-4 group border border-transparent hover:border-gray-100">
+                    <div class="w-12 h-12 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center text-xl font-bold uppercase shrink-0">${c.charAt(0)}</div>
+                    <div class="flex-1">
+                        <h3 class="font-bold text-gray-800 text-lg capitalize">${c}</h3>
+                        <p class="text-xs text-gray-400">View all campaigns</p>
+                    </div>
+                    ${state.role === 'admin' ? `
+                        <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="renameClient(event, '${c}')" class="text-gray-500 hover:text-black hover:bg-gray-100 p-2 rounded-lg transition"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="deleteClient(event, '${c}')" class="text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg transition"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    ` : `<i class="fa-solid fa-chevron-right text-gray-300"></i>`}
+                </div>
+            `).join('');
+            if(clients.length === 0) listHtml = `<div class="text-center text-gray-400 mt-10">No clients found. Create a project!</div>`;
+            return `
+                <div class="bg-transparent h-full flex flex-col relative">
+                    ${renderHeader('All Clients', 'Admin Directory', false)}
+                    <div class="flex-1 overflow-y-auto px-6 pb-20 scroll-area">${listHtml}</div>
+                    <div class="fab" onclick="openCreateModal()"><i class="fa-solid fa-plus"></i></div>
+                </div>
+            `;
+        }
+
+        function renderCampaignsHub() {
+            const clientProjects = state.projects.filter(p => p.clientUsername === state.activeClientUsername);
+            const campaigns = [...new Set(clientProjects.map(p => p.campaignName))].filter(Boolean);
+            let listHtml = campaigns.map(camp => `
+                <div onclick="openCampaign('${camp}')" class="bg-white rounded-2xl p-5 mb-4 card-shadow shrink-0 cursor-pointer transform transition hover:-translate-y-1 flex items-center gap-4 group border border-transparent hover:border-gray-100">
+                    <div class="w-12 h-12 rounded-xl bg-gray-50 text-gray-800 flex items-center justify-center text-xl shrink-0"><i class="fa-solid fa-folder-open"></i></div>
+                    <div class="flex-1">
+                        <h3 class="font-bold text-gray-800 text-md">${camp}</h3>
+                        <p class="text-xs text-gray-400 mt-1">Select to view videos</p>
+                    </div>
+                    ${state.role === 'admin' ? `
+                        <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="renameCampaign(event, '${camp}')" class="text-gray-500 hover:text-black hover:bg-gray-100 p-2 rounded-lg transition"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="deleteCampaign(event, '${camp}')" class="text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg transition"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    ` : `<i class="fa-solid fa-chevron-right text-gray-300"></i>`}
+                </div>
+            `).join('');
+            if(campaigns.length === 0) listHtml = `<div class="text-center text-gray-400 mt-10">No campaigns found.</div>`;
+            return `
+                <div class="bg-transparent h-full flex flex-col relative">
+                    ${renderHeader('Campaigns', `Client: ${state.activeClientUsername}`, state.role === 'admin')}
+                    <div class="flex-1 overflow-y-auto px-6 pb-20 scroll-area">${listHtml}</div>
+                    ${state.role === 'admin' ? `<div class="fab" onclick="openCreateModal()"><i class="fa-solid fa-plus"></i></div>` : ''}
+                </div>
+            `;
+        }
+
+        function renderVideosHub() {
+            const videos = state.projects.filter(p => p.clientUsername === state.activeClientUsername && p.campaignName === state.activeCampaignName);
+            let listHtml = videos.map(p => `
+                <div onclick="openProject('${p.id}')" class="bg-white rounded-3xl p-5 mb-4 card-shadow shrink-0 cursor-pointer transform transition hover:-translate-y-1 border border-gray-100 group">
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center shrink-0"><i class="fa-solid fa-film"></i></div>
+                            <div>
+                                <h3 class="font-bold text-gray-800 text-md">${p.title}</h3>
+                                <p class="text-xs text-gray-400">View Dashboard</p>
+                            </div>
+                        </div>
+                        <div class="text-right shrink-0"><span class="text-black font-bold text-lg">${p.progress}%</span></div>
+                    </div>
+                    <div class="w-full bg-gray-100 rounded-full h-1.5 mt-2 mb-3 shrink-0">
+                        <div class="bg-orange-500 h-1.5 rounded-full" style="width: ${p.progress}%"></div>
+                    </div>
+                    <div class="flex justify-between items-center text-sm font-medium shrink-0">
+                        <span class="text-gray-500">Status: <span class="text-orange-500 font-bold">${getSyncStatus(p)}</span></span>
+                        ${state.role === 'admin' ? `
+                            <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onclick="renameVideo(event, '${p.id}', '${p.title}')" class="text-gray-500 hover:text-black hover:bg-gray-100 p-2 rounded-lg transition"><i class="fa-solid fa-pen"></i></button>
+                                <button onclick="deleteVideo(event, '${p.id}')" class="text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg transition"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+            return `
+                <div class="bg-transparent h-full flex flex-col relative">
+                    ${renderHeader('Videos', `Campaign: ${state.activeCampaignName}`, true)}
+                    <div class="flex-1 overflow-y-auto px-6 pb-20 scroll-area">${listHtml}</div>
+                    ${state.role === 'admin' ? `<div class="fab" onclick="openCreateModal()"><i class="fa-solid fa-plus"></i></div>` : ''}
+                </div>
+            `;
+        }
+
+        function renderDashboardScreen() {
+            const project = state.projects.find(p => p.id === state.activeProjectId);
+            if (!project) return `<div class="p-8 shrink-0">Loading Project Data...</div>`;
+
+            const isAdmin = state.role === 'admin';
+            
+            // Standard SVG Circle Math with safe bounding box (r=40 in 100x100 box leaves 10px safe padding all around)
+            const radius = 40;
+            const circumference = 2 * Math.PI * radius; 
+            const dashOffset = circumference - (project.progress / 100) * circumference;
+
+            // Sync Status dynamically driven by the map
+            const syncedStatus = getSyncStatus(project);
+
+            // Create preset WhatsApp Message using the specific Campaign & Video
+            const waMessage = `Hi! I need some help with my project:\nCampaign: *${project.campaignName}*\nVideo: *${project.title}*`;
+            const waLink = `https://wa.me/919567038524?text=${encodeURIComponent(waMessage)}`;
+
+            // Timeline line heights for visual tracking
+            const totalTasks = project.timeline.length;
+            const completedCount = project.timeline.filter(t => t.state === 'done').length;
+            const activeIndex = project.timeline.findIndex(t => t.state === 'active');
+
+            const solidHeight = totalTasks > 1 ? (completedCount / (totalTasks - 1)) * 100 : 0;
+            let animatedHeight = (activeIndex !== -1 && totalTasks > 1) ? (1 / (totalTasks - 1)) * 100 : 0;
+
+            // 1. Files & Links Generation
+            let deliverablesHtml = (project.deliverables || []).map((d, index) => `
+                <a href="${d.url || '#'}" target="${d.url ? '_blank' : '_self'}" class="deliverable-item flex items-center justify-between mb-4 last:mb-0 bg-white border border-gray-100 p-4 rounded-xl shadow-sm group shrink-0">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-lg bg-orange-50 text-orange-500 flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors duration-300 shadow-inner shrink-0">
+                            <i class="fa-solid ${d.icon || 'fa-link'}"></i>
+                        </div>
+                        <div>
+                            <span class="block font-bold text-gray-800 text-sm group-hover:text-orange-500 transition-colors">${d.name}</span>
+                            <span class="block text-xs text-gray-400 font-medium mt-0.5">${d.time}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center shrink-0">
+                        ${state.role === 'admin' ? `
+                            <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity mr-2">
+                                <button onclick="renameDeliverable(event, ${index}, '${d.name.replace(/'/g, "\\'")}')" class="text-gray-400 hover:text-black hover:bg-gray-100 w-8 h-8 rounded-lg transition flex items-center justify-center" title="Rename"><i class="fa-solid fa-pen text-xs"></i></button>
+                                <button onclick="deleteDeliverable(event, ${index})" class="text-red-400 hover:text-red-600 hover:bg-red-50 w-8 h-8 rounded-lg transition flex items-center justify-center" title="Delete"><i class="fa-solid fa-trash text-xs"></i></button>
+                            </div>
+                        ` : ''}
+                        ${d.url ? '<i class="fa-solid fa-arrow-right text-gray-300 group-hover:text-orange-500 group-hover:translate-x-1 transition-all"></i>' : ''}
+                    </div>
+                </a>
+            `).join('');
+
+            if((project.deliverables || []).length === 0) deliverablesHtml = `<p class="text-sm text-gray-400 italic bg-gray-50 p-4 rounded-xl text-center border border-dashed border-gray-200 shrink-0">No files delivered yet.</p>`;
+
+            // 2. Timeline Tracker Generation
+            let timelineHtml = project.timeline.map((item, index) => {
+                let statusClasses = "", icon = "";
+                
+                // Using relative position so the circles perfectly cover the line below them
+                if (item.state === 'done') {
+                    statusClasses = "text-gray-800 font-semibold";
+                    icon = `<div class="relative ${isAdmin ? 'cursor-pointer hover:scale-110' : ''} w-8 h-8 rounded-full bg-black text-white flex items-center justify-center z-10 text-[14px] shadow-sm transition-transform shrink-0" ${isAdmin ? `onclick="editTimelineState(${index}, '${item.state}')"` : ''}><i class="fa-solid fa-check"></i></div>`;
+                } else if (item.state === 'active') {
+                    statusClasses = "text-orange-500 font-bold text-lg";
+                    icon = `<div class="relative ${isAdmin ? 'cursor-pointer hover:scale-110' : ''} w-8 h-8 rounded-full bg-white border-[4px] border-orange-500 z-10 shadow-md transition-transform active-dot shrink-0" ${isAdmin ? `onclick="editTimelineState(${index}, '${item.state}')"` : ''}></div>`;
+                } else {
+                    statusClasses = "text-gray-400 font-medium";
+                    icon = `<div class="relative ${isAdmin ? 'cursor-pointer hover:scale-110' : ''} w-8 h-8 rounded-full bg-white border-[3px] border-gray-200 z-10 transition-transform shrink-0" ${isAdmin ? `onclick="editTimelineState(${index}, '${item.state}')"` : ''}></div>`;
+                }
+
+                let displayTimeStr = item.timeStr || 'No date set';
+                if (item.state === 'done' && displayTimeStr.includes('Expected:')) {
+                    displayTimeStr = displayTimeStr.replace('Expected:', 'Completed:');
+                }
+
+                const timeColorClass = (displayTimeStr.toLowerCase().includes('expected')) ? 'text-orange-500 font-medium' : 'text-gray-400';
+                const rawDateStr = item.rawDate || '';
+
+                let timeSectionHtml = '';
+                // Show dates for completed items, unless it still says "TBD"
+                if (item.state !== 'done' || (item.state === 'done' && !displayTimeStr.includes('TBD'))) {
+                    timeSectionHtml = `
+                        <div class="mt-1 flex items-center gap-1 text-[11px] ${isAdmin ? 'cursor-pointer hover:opacity-70' : ''}"
+                             ${isAdmin ? `onclick="editTimelineDate(${index}, '${rawDateStr}')"` : ''}>
+                            <i class="fa-regular ${item.state === 'done' ? 'fa-calendar-check' : 'fa-clock'} ${timeColorClass}"></i> 
+                            <span class="${timeColorClass}">${displayTimeStr}</span>
+                            ${isAdmin ? '<i class="fa-solid fa-pen ml-1 opacity-30 text-gray-800"></i>' : ''}
+                        </div>
+                    `;
+                }
+
+                return `
+                    <div class="timeline-item flex items-center gap-4 mb-6 relative shrink-0">
+                        ${icon}
+                        <div class="${statusClasses} bg-white px-4 py-3 rounded-2xl shadow-sm flex-1 border border-gray-100 card-shadow shrink-0">
+                            <div class="flex justify-between items-center">
+                                <span>${item.title}</span>
+                                ${item.state === 'active' ? `<i class="fa-solid fa-spinner fa-spin text-orange-500 text-xs"></i>` : ''}
+                            </div>
+                            ${timeSectionHtml}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="flex flex-col h-full bg-transparent relative">
+                    <div class="px-6 pt-8 pb-4 flex justify-between items-center bg-white z-10 sticky top-0 border-b border-gray-100 shrink-0">
+                        <button onclick="goBack()" class="text-gray-600 w-10 h-10 flex items-center justify-center bg-gray-50 rounded-full shadow-sm hover:bg-gray-100 shrink-0">
+                            <i class="fa-solid fa-arrow-left"></i>
+                        </button>
+                        <div class="text-xs font-bold text-gray-400 uppercase truncate px-4 flex-1 text-center">${project.title}</div>
+                        <div class="flex gap-2 shrink-0">
+                            <button onclick="forceRefresh()" class="w-10 h-10 bg-gray-50 text-gray-400 rounded-full flex items-center justify-center shadow-sm hover:bg-gray-100 transition" title="Refresh">
+                                <i class="fa-solid fa-arrows-rotate"></i>
+                            </button>
+                            <img src="aigfox logo.png" alt="Aigfox" class="w-10 h-10 rounded-full object-cover shadow-sm shrink-0" onerror="this.src='https://placehold.co/40x40/000/fff?text=AF'; this.onerror=null;" />
+                        </div>
+                    </div>
+                    
+                    <div class="scroll-area flex flex-col gap-6">
+                        
+                        <!-- Header & Progress -->
+                        <div class="shrink-0">
+                            <div class="mb-2 mt-2">
+                                <p class="text-xs text-orange-500 font-bold uppercase tracking-wider mb-1">Video Overview</p>
+                                <h2 class="text-3xl font-extrabold text-gray-900 leading-tight">${project.title}</h2>
+                            </div>
+
+                            <div class="gradient-card rounded-3xl p-6 mt-4 card-shadow relative shrink-0">
+                                <div class="absolute top-0 right-0 w-32 h-32 bg-white opacity-5 rounded-full -mr-10 -mt-10 overflow-hidden"></div>
+                                <div class="flex justify-between items-center relative z-10">
+                                    <div class="w-1/2 pr-2">
+                                        <h3 class="font-bold text-lg mb-1">Project Progress</h3>
+                                        <div class="inline-block bg-white bg-opacity-10 px-3 py-1.5 rounded-lg mt-2 cursor-default">
+                                            <p class="text-xs text-gray-300 uppercase tracking-wider font-semibold flex items-center gap-1">
+                                                Current Phase
+                                            </p>
+                                            <p class="text-sm font-bold text-white">${syncedStatus}</p>
+                                        </div>
+                                    </div>
+                                    <div class="w-1/2 flex justify-end relative pr-2">
+                                        <!-- Fixed Progress Circle: Completely visible and perfectly spaced inside 100x100 SVG box -->
+                                        <div class="relative w-24 h-24 shrink-0">
+                                            <svg viewBox="0 0 100 100" class="absolute inset-0 w-full h-full transform -rotate-90">
+                                                <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="8"></circle>
+                                                <circle cx="50" cy="50" r="40" fill="none" stroke="#f97316" stroke-width="8" stroke-linecap="round" stroke-dasharray="251.2" stroke-dashoffset="${dashOffset}" style="transition: stroke-dashoffset 1s ease-out;"></circle>
+                                            </svg>
+                                            <div class="absolute inset-0 flex flex-col items-center justify-center text-center ${isAdmin ? 'cursor-pointer hover:scale-105 transition-transform' : ''}" ${isAdmin ? `onclick="editProgress(${project.progress})"` : ''} title="${isAdmin ? 'Click to edit percentage' : ''}">
+                                                <span class="text-[22px] font-extrabold leading-none ${isAdmin ? 'mt-2' : ''}">${project.progress}%</span>
+                                                ${isAdmin ? '<div class="bg-white/20 text-white text-[10px] px-3 py-1 rounded-full mt-1 border border-white/20 backdrop-blur-md flex items-center gap-1.5 shadow-sm"><i class="fa-solid fa-pen text-[8px]"></i> Edit</div>' : ''}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Notes Section (Clean & Expanded) -->
+                        <div class="bg-[#fff9f2] border border-orange-100 rounded-3xl p-6 card-shadow shrink-0 ${isAdmin ? 'cursor-pointer hover:border-orange-200 transition' : ''}"
+                             ${isAdmin ? `onclick="editCustomMessage('${project.customMessage.replace(/'/g, "\\'")}')"` : ''}>
+                            
+                            <div class="flex items-center gap-3 mb-5">
+                                <div class="w-10 h-10 rounded-full bg-orange-100 text-orange-500 flex items-center justify-center shrink-0">
+                                    <i class="fa-solid fa-comment-dots text-lg"></i>
+                                </div>
+                                <h4 class="font-bold text-gray-900 text-lg flex-1">Note from Team</h4>
+                                ${isAdmin ? '<div class="bg-white shadow-sm text-gray-500 p-2 rounded-full w-8 h-8 flex items-center justify-center transition hover:text-orange-500"><i class="fa-solid fa-pen text-xs"></i></div>' : ''}
+                            </div>
+                            
+                            <div class="bg-white rounded-2xl p-5 shadow-sm border border-orange-50">
+                                <span class="block text-[11px] uppercase tracking-widest text-orange-500 mb-2 font-bold">Latest Update</span>
+                                <div class="text-sm text-gray-900 leading-relaxed font-semibold">
+                                    ${project.customMessage}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Integrated Timeline -->
+                        <div class="mt-4 shrink-0">
+                            <div id="delivery-map-container" class="bg-white rounded-2xl relative">
+                                <h3 class="font-extrabold text-xl text-gray-900 mb-6 pl-1 flex items-center gap-2">
+                                    <i class="fa-solid fa-route text-orange-500"></i> Delivery Map
+                                </h3>
+                                <div class="relative pb-2">
+                                    <!-- The line perfectly starts at the center of the top item (16px) and ends securely within bounds -->
+                                    <div class="absolute left-[14px] top-[16px] bottom-[40px] w-[4px] bg-gray-200 z-0 overflow-hidden rounded-full shadow-inner">
+                                        <div class="w-full bg-black transition-all duration-1000 ease-in-out" style="height: ${Math.min(100, solidHeight)}%;"></div>
+                                        <div class="w-full timeline-line-active transition-all duration-1000 ease-in-out" style="height: ${Math.min(100 - solidHeight, animatedHeight)}%;"></div>
+                                    </div>
+                                    ${timelineHtml}
+                                </div>
+                            </div>
+                            
+                            <!-- Save button now available to both Admin and Clients -->
+                            <button onclick="downloadDeliveryMap()" class="mt-4 mb-2 w-full bg-white border border-gray-200 text-gray-700 font-bold py-3 rounded-xl shadow-sm hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-download text-orange-500"></i> Save Map as Image
+                            </button>
+                            
+                        </div>
+
+                        <!-- Files & Links Section -->
+                        <div class="bg-gray-50 rounded-3xl p-6 border border-gray-100 shrink-0">
+                            <div class="flex justify-between items-center mb-5">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center text-gray-400 shrink-0">
+                                        <i class="fa-regular fa-folder-open"></i>
+                                    </div>
+                                    <h3 class="font-extrabold text-gray-900 text-lg">Files & Links</h3>
+                                </div>
+                                ${isAdmin ? `
+                                <button onclick="openDeliverableModal()" class="text-orange-500 text-xs font-bold bg-white px-4 py-2 rounded-xl shadow-sm hover:shadow transition border border-gray-100 shrink-0">
+                                    <i class="fa-solid fa-plus mr-1"></i> Add Link
+                                </button>
+                                ` : ''}
+                            </div>
+                            <div class="space-y-3">
+                                ${deliverablesHtml}
+                            </div>
+                        </div>
+
+                        <!-- WhatsApp Help (Bottom) -->
+                        <div class="bg-black rounded-3xl p-6 card-shadow text-center mb-6 shrink-0">
+                            <div class="w-14 h-14 bg-gray-800 text-white rounded-full flex items-center justify-center mx-auto mb-3 text-2xl shadow-inner shrink-0">
+                                <i class="fa-brands fa-whatsapp"></i>
+                            </div>
+                            <h3 class="font-bold text-white mb-1">Need help or changes?</h3>
+                            <p class="text-xs text-gray-400 mb-4 px-4">Got questions? We are just a text away.</p>
+                            <a href="${waLink}" target="_blank" class="inline-flex w-full justify-center items-center gap-2 bg-[#25D366] text-white font-bold py-4 rounded-xl shadow-md hover:bg-[#1ebe5d] transition-colors shrink-0">
+                                <i class="fa-brands fa-whatsapp text-lg"></i> Chat on WhatsApp
+                            </a>
+                        </div>
+                        
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- START APP ---
+        render(); 
+    </script>
+</body>
+</html>
